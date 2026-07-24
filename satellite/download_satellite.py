@@ -6,7 +6,7 @@ catalog = Client.open(
     "https://planetarycomputer.microsoft.com/api/stac/v1"
 )
 
-bbox = [78.95, 21.05, 79.20, 21.25]
+bbox = [78.95, 21.05, 79.20, 21.25]   # Nagpur
 
 search = catalog.search(
     collections=["sentinel-2-l2a"],
@@ -17,7 +17,9 @@ search = catalog.search(
 
 items = list(search.items())
 
-print(f"Found {len(items)} Sentinel-2 images")
+print(f"\nFound {len(items)} Sentinel-2 Images\n")
 
-for i, item in enumerate(items):
-    print(f"{i+1}. {item.id}")
+for i, item in enumerate(items, start=1):
+    print(f"{i}. {item.id}")
+    print("Date:", item.datetime)
+    print("-"*60)
