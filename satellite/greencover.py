@@ -1,54 +1,49 @@
-import os
 import rasterio
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import os
 
-# Create output folder
 os.makedirs("output", exist_ok=True)
 
-# Read Bands
-red = rasterio.open("satellite/data/B04.tif").read(1).astype(float)
-nir = rasterio.open("satellite/data/B08.tif").read(1).astype(float)
+print("Opening image...")
 
-# Calculate NDVI
-ndvi = (nir - red) / (nir + red + 1e-10)
+with rasterio.open("satellite/data/nagpur_visual.tif") as src:
 
-# Green Cover Detection
-green = np.zeros(ndvi.shape, dtype=np.uint8)
+    # Read a smaller preview
+    red = src.read(1, out_shape=(500, 500)).astype(float)
+    green = src.read(2, out_shape=(500, 500)).astype(float)
+    blue = src.read(3, out_shape=(500, 500)).astype(float)
 
-green[ndvi >= 0.3] = 1
+print("Calculating Green Cover...")
 
-green_percentage = (np.sum(green == 1) / green.size) * 100
+# Simple Green Cover Index
+green_index = green / (red + blue + 1e-10)
 
-# Save CSV
+green_cover = np.where(
+    green_index > 0.45,
+    "Dense Vegetation",
+    np.where(
+        green_index > 0.30,
+        "Moderate Vegetation",
+        "Low Vegetation"
+    )
+)
+
 df = pd.DataFrame({
-    "GreenCover": green.flatten()
-})
-
-df["Class"] = df["GreenCover"].map({
-    0: "Non Green",
-    1: "Green Area"
+    "GreenIndex": green_index.flatten(),
+    "GreenCover": green_cover.flatten()
 })
 
 df.to_csv("output/Nagpur_GreenCover.csv", index=False)
 
-# Save PNG
-plt.figure(figsize=(8,6))
-plt.imshow(green, cmap="Greens")
-plt.title(f"Nagpur Green Cover ({green_percentage:.2f}%)")
-plt.colorbar(label="Green Cover")
-plt.axis("off")
-
-plt.savefig(
-    "output/Nagpur_GreenCover.png",
-    dpi=300,
-    bbox_inches="tight"
-)
-
+plt.imshow(green_index, cmap="Greens")
+plt.colorbar(label="Green Index")
+plt.title("Nagpur Green Cover")
+plt.savefig("output/Nagpur_GreenCover.png")
 plt.close()
 
-print("Green Cover Analysis Completed")
-print(f"Green Cover = {green_percentage:.2f}%")
-print("CSV Saved -> output/Nagpur_GreenCover.csv")
-print("PNG Saved -> output/Nagpur_GreenCover.png")
+print("Green Cover Analysis Completed!")
+print("Output saved as:")
+print("output/Nagpur_GreenCover.csv")
+print("output/Nagpur_GreenCover.png")

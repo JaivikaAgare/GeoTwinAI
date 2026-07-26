@@ -3,11 +3,6 @@ import planetary_computer
 import requests
 import os
 
-<<<<<<< HEAD
-print("Connecting to Microsoft Planetary Computer...")
-
-=======
->>>>>>> 7f0a5f349a83029e6512446f06d51b3346cceb12
 catalog = Client.open(
     "https://planetarycomputer.microsoft.com/api/stac/v1"
 )
@@ -29,29 +24,6 @@ if not items:
 
 item = planetary_computer.sign(items[0])
 
-<<<<<<< HEAD
-os.makedirs("satellite/data", exist_ok=True)
-
-bands = {
-    "B04": "B04.tif",
-    "B08": "B08.tif"
-}
-
-for band, filename in bands.items():
-
-    print(f"Downloading {band}...")
-
-    url = item.assets[band].href
-
-    response = requests.get(url, stream=True)
-
-    with open(f"satellite/data/{filename}", "wb") as f:
-        for chunk in response.iter_content(chunk_size=8192):
-            if chunk:
-                f.write(chunk)
-
-print("\nDownload Completed Successfully!")
-=======
 asset = item.assets["visual"]
 
 url = asset.href
@@ -71,4 +43,3 @@ with open(output, "wb") as f:
 
 print("Download completed!")
 print(output)
->>>>>>> 7f0a5f349a83029e6512446f06d51b3346cceb12

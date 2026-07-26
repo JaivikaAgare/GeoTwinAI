@@ -4,52 +4,148 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# Create output folder
 os.makedirs("output", exist_ok=True)
 
-# Read Bands
-red = rasterio.open("satellite/data/B04.tif").read(1).astype(float)
-nir = rasterio.open("satellite/data/B08.tif").read(1).astype(float)
+print("=" * 50)
+print("Opening Satellite Image...")
+print("=" * 50)
 
-# Calculate NDVI
-ndvi = (nir - red) / (nir + red + 1e-10)
+with rasterio.open("satellite/data/nagpur_visual.tif") as src:
 
-# Land Use Classification
-landuse = np.zeros(ndvi.shape, dtype=np.uint8)
+    red = src.read(1, out_shape=(500, 500)).astype(float)
+    green = src.read(2, out_shape=(500, 500)).astype(float)
+    blue = src.read(3, out_shape=(500, 500)).astype(float)
 
-# Rule-based Classification
-landuse[ndvi < 0] = 1                     # Water
-landuse[(ndvi >= 0) & (ndvi < 0.2)] = 2   # Built-up
-landuse[(ndvi >= 0.2) & (ndvi < 0.5)] = 3 # Vegetation
-landuse[ndvi >= 0.5] = 4                  # Dense Vegetation
+print("Image Loaded Successfully")
 
-# Labels
-labels = {
-    1: "Water",
-    2: "Built-up",
-    3: "Vegetation",
-    4: "Dense Vegetation"
-}
+# -------------------------
+# LAND USE CLASSIFICATION
+# -------------------------
 
-# Save CSV
-df = pd.DataFrame({
-    "LandUse": landuse.flatten()
-})
+landuse = np.zeros(red.shape)
 
-df["Class"] = df["LandUse"].map(labels)
+# Water
+landuse[(blue > green) & (blue > red)] = 1
 
-df.to_csv("output/Nagpur_LandUse.csv", index=False)
+# Vegetation
+landuse[(green > red) & (green > blue)] = 2
 
-# Save PNG
-plt.figure(figsize=(8,6))
+# Built-up
+landuse[(red > green) & (red > blue)] = 3
+
+# Bare Land
+landuse[landuse == 0] = 4
+
+# -------------------------
+# GRID SUMMARY
+# -------------------------
+
+GRID = 20
+
+rows, cols = landuse.shape
+
+cell_h = rows // GRID
+cell_w = cols // GRID
+
+records = []
+
+grid = 1
+
+for r in range(GRID):
+
+    for c in range(GRID):
+
+        rs = r * cell_h
+        re = (r + 1) * cell_h
+
+        cs = c * cell_w
+        ce = (c + 1) * cell_w
+
+        block = landuse[rs:re, cs:ce]
+
+        total = block.size
+
+        water = np.sum(block == 1)
+        vegetation = np.sum(block == 2)
+        built = np.sum(block == 3)
+        bare = np.sum(block == 4)
+
+        values = {
+            "Water": water,
+            "Vegetation": vegetation,
+            "Built-up": built,
+            "Bare Land": bare
+        }
+
+        dominant = max(values, key=values.get)
+
+        records.append({
+
+            "Grid_ID": f"G{grid}",
+
+            "Water_%": round(water * 100 / total, 2),
+
+            "Vegetation_%": round(vegetation * 100 / total, 2),
+
+            "BuiltUp_%": round(built * 100 / total, 2),
+
+            "BareLand_%": round(bare * 100 / total, 2),
+
+            "Dominant_Class": dominant
+
+        })
+
+        grid += 1
+
+df = pd.DataFrame(records)
+
+csv_path = "output/Nagpur_LandUse.csv"
+
+df.to_csv(csv_path, index=False)
+
+print("CSV Saved Successfully")
+
+# -------------------------
+# SAVE PNG
+# -------------------------
+
+plt.figure(figsize=(10,10))
+
 plt.imshow(landuse, cmap="terrain")
-plt.colorbar(label="Land Use Class")
+
+cbar = plt.colorbar()
+
+cbar.set_ticks([1,2,3,4])
+
+cbar.set_ticklabels([
+    "Water",
+    "Vegetation",
+    "Built-up",
+    "Bare Land"
+])
+
 plt.title("Nagpur Land Use Classification")
+
 plt.axis("off")
 
-plt.savefig("output/Nagpur_LandUse.png", dpi=300, bbox_inches="tight")
+png_path = "output/Nagpur_LandUse.png"
+
+plt.savefig(
+    png_path,
+    dpi=300,
+    bbox_inches="tight"
+)
+
 plt.close()
 
-print("Land Use Classification Completed Successfully")
-print("CSV Saved: output/Nagpur_LandUse.csv")
-print("PNG Saved: output/Nagpur_LandUse.png")
+print("PNG Saved Successfully")
+
+print("=" * 50)
+print("LAND USE ANALYSIS COMPLETED")
+print("=" * 50)
+
+print(f"CSV : {csv_path}")
+print(f"PNG : {png_path}")
+
+print("\nPreview:")
+print(df.head())

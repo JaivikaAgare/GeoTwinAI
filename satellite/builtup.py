@@ -1,52 +1,45 @@
-import os
 import rasterio
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import os
 
-# Create output folder
 os.makedirs("output", exist_ok=True)
 
-# Read Bands
-red = rasterio.open("satellite/data/B04.tif").read(1).astype(float)
-nir = rasterio.open("satellite/data/B08.tif").read(1).astype(float)
+print("Opening image...")
 
-# NDVI
-ndvi = (nir - red) / (nir + red + 1e-10)
+with rasterio.open("satellite/data/nagpur_visual.tif") as src:
 
-# Built-up Detection
-builtup = np.zeros(ndvi.shape, dtype=np.uint8)
+    # Read a smaller preview
+    red = src.read(1, out_shape=(500, 500)).astype(float)
+    green = src.read(2, out_shape=(500, 500)).astype(float)
+    blue = src.read(3, out_shape=(500, 500)).astype(float)
 
-# Rule:
-# NDVI < 0.2 = Built-up
-builtup[ndvi < 0.2] = 1
-builtup[ndvi >= 0.2] = 0
+print("Detecting Built-up Areas...")
 
-# Save CSV
+# Simple Built-up Index
+builtup_index = (red + green) / (blue + 1e-10)
+
+builtup = np.where(
+    builtup_index > 2.0,
+    "Built-up",
+    "Non Built-up"
+)
+
 df = pd.DataFrame({
+    "BuiltUpIndex": builtup_index.flatten(),
     "BuiltUp": builtup.flatten()
-})
-
-df["Class"] = df["BuiltUp"].map({
-    0: "Non Built-up",
-    1: "Built-up"
 })
 
 df.to_csv("output/Nagpur_BuiltUp.csv", index=False)
 
-# Save PNG
-plt.figure(figsize=(8,6))
-plt.imshow(builtup, cmap="gray")
+plt.imshow(builtup_index, cmap="gray")
+plt.colorbar(label="Built-up Index")
 plt.title("Nagpur Built-up Area")
-plt.colorbar(label="Built-up")
-plt.axis("off")
-
-plt.savefig("output/Nagpur_BuiltUp.png",
-            dpi=300,
-            bbox_inches="tight")
-
+plt.savefig("output/Nagpur_BuiltUp.png")
 plt.close()
 
-print("Built-up Detection Completed Successfully")
-print("CSV Saved -> output/Nagpur_BuiltUp.csv")
-print("PNG Saved -> output/Nagpur_BuiltUp.png")
+print("Built-up Analysis Completed!")
+print("Output saved as:")
+print("output/Nagpur_BuiltUp.csv")
+print("output/Nagpur_BuiltUp.png")
